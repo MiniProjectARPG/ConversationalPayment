@@ -88,3 +88,38 @@ def razorpay_payment(amount, recipient):
         'recipient': recipient,
         'payment_link': f"https://checkout.razorpay.com/v1/checkout.js"
     })
+    # Function to handle PhonePe payment
+def phonepe_payment(amount, recipient):
+    # PhonePe payment request details
+    phonepe_request_data = {
+        "merchantId": PHONEPE_MERCHANT_ID,
+        "transactionId": "txn_" + str(hashlib.sha256(recipient.encode()).hexdigest()[:10]),
+        "amount": int(amount) * 100,  # Amount in paise
+        "merchantOrderId": "order_" + str(hashlib.sha256(recipient.encode()).hexdigest()[:10]),
+        "successUrl": "https://www.yourdomain.com/success",  # URL after success
+        "failureUrl": "https://www.yourdomain.com/failure",  # URL after failure
+        "paymentInstrument": {
+            "type": "UPI_INTENT"
+        }
+    }
+
+    # Convert request to JSON and generate the checksum hash
+    phonepe_payload = json.dumps(phonepe_request_data)
+    checksum = hashlib.sha256((phonepe_payload + PHONEPE_SALT_KEY).encode()).hexdigest()
+
+    headers = {
+        'Content-Type': 'application/json',
+        'X-VERIFY': checksum + "###" + PHONEPE_SALT_KEY
+    }
+
+    # Send the request to PhonePe
+    response = requests.post(PHONEPE_BASE_URL + 'payment/initiate', data=phonepe_payload, headers=headers)
+
+    return jsonify({
+        'status': response.status_code,
+        'response': response.json(),
+        'payment_link': response.json().get("data").get("instrumentResponse").get("redirectUrl")
+    })
+
+if _name_ == '_main_':
+    app.run(debug=True)
